@@ -84,7 +84,7 @@
 }).call(this);
 
 (function() {
-  var ALPHA_CHARS, ALPHA_NUMERIC_CHARS, ATTR_DELIM, ATTR_ENTITY_DOUBLE_DELIM, ATTR_ENTITY_NO_DELIM, ATTR_ENTITY_SINGLE_DELIM, ATTR_NAME, ATTR_NAME_FIND_VALUE, ATTR_OR_TAG_END, ATTR_VALUE_DOUBLE_DELIM, ATTR_VALUE_NO_DELIM, ATTR_VALUE_SINGLE_DELIM, CHAR_OR_ENTITY_OR_TAG, CLOSING_TAG, ENTITY, ENTITY_CHARS, OPENING_TAG, OPENNING_OR_CLOSING_TAG, TAG_NAME_CLOSING, TAG_NAME_MUST_CLOSE, TAG_NAME_OPENING, TAG_OPENING_SELF_CLOSING, _Parser,
+  var ALPHA_CHARS, ALPHA_NUMERIC_CHARS, ATTR_DELIM, ATTR_ENTITY_DOUBLE_DELIM, ATTR_ENTITY_NO_DELIM, ATTR_ENTITY_SINGLE_DELIM, ATTR_NAME, ATTR_NAME_FIND_VALUE, ATTR_OR_TAG_END, ATTR_VALUE_DOUBLE_DELIM, ATTR_VALUE_NO_DELIM, ATTR_VALUE_SINGLE_DELIM, CHAR_OR_ENTITY_OR_TAG, CLOSING_TAG, ENTITY, ENTITY_CHARS, OPENING_TAG, OPENNING_OR_CLOSING_TAG, TAG_NAME_CHARS, TAG_NAME_CLOSING, TAG_NAME_MUST_CLOSE, TAG_NAME_OPENING, TAG_OPENING_SELF_CLOSING, _Parser,
     __slice = [].slice,
     __indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
 
@@ -312,7 +312,7 @@
     };
 
     String.prototype.indexOf = function(substring, from) {
-      var c, found, i, skip, _i, _j, _len, _len1, _ref;
+      var c, found, i, _i, _len, _ref;
       if (from == null) {
         from = 0;
       }
@@ -320,34 +320,12 @@
         from = 0;
       }
       if (typeof substring === 'string') {
-        if (!this.contains(substring)) {
-          return -1;
-        }
-        substring = substring.split('');
-        while (from <= (this.length() - substring.length)) {
-          found = true;
-          skip = 0;
-          for (i = _i = 0, _len = substring.length; _i < _len; i = ++_i) {
-            c = substring[i];
-            if (this.characters[i + from].isTag()) {
-              skip += 1;
-            }
-            if (c !== this.characters[skip + i + from].c()) {
-              found = false;
-              break;
-            }
-          }
-          if (found) {
-            return from;
-          }
-          from++;
-        }
-        return -1;
+        return this.text().indexOf(substring, from);
       }
       while (from <= (this.length() - substring.length())) {
         found = true;
         _ref = substring.characters;
-        for (i = _j = 0, _len1 = _ref.length; _j < _len1; i = ++_j) {
+        for (i = _i = 0, _len = _ref.length; _i < _len; i = ++_i) {
           c = _ref[i];
           if (!c.eq(this.characters[i + from])) {
             found = false;
@@ -813,6 +791,8 @@
 
   ENTITY_CHARS = ALPHA_NUMERIC_CHARS.concat(['#']);
 
+  TAG_NAME_CHARS = ALPHA_NUMERIC_CHARS.concat([':']);
+
   CHAR_OR_ENTITY_OR_TAG = 1;
 
   ENTITY = 2;
@@ -880,7 +860,7 @@
       this.fsm.addTransitions(ALPHA_CHARS, CLOSING_TAG, TAG_NAME_CLOSING, function() {
         return this._back();
       });
-      this.fsm.addTransitions(ALPHA_NUMERIC_CHARS, TAG_NAME_OPENING, null, function(c) {
+      this.fsm.addTransitions(TAG_NAME_CHARS, TAG_NAME_OPENING, null, function(c) {
         return this.tagName += c;
       });
       this.fsm.addTransitions([' ', '\n'], TAG_NAME_OPENING, ATTR_OR_TAG_END);
@@ -904,7 +884,7 @@
       this.fsm.addTransitions(ALPHA_CHARS, ATTR_OR_TAG_END, ATTR_NAME, function() {
         return this._back();
       });
-      this.fsm.addTransitions(ALPHA_NUMERIC_CHARS, TAG_NAME_CLOSING, null, function(c) {
+      this.fsm.addTransitions(TAG_NAME_CHARS, TAG_NAME_CLOSING, null, function(c) {
         return this.tagName += c;
       });
       this.fsm.addTransitions([' ', '\n'], TAG_NAME_CLOSING, TAG_NAME_MUST_CLOSE);
@@ -1032,7 +1012,7 @@
         tag = this.tags.pop();
         if (this.string.length()) {
           character = this.string.characters[this.string.length() - 1];
-          if (!character.isTag() && character.isWhitespace()) {
+          if (!character.isTag() && !character.isEntity() && character.isWhitespace()) {
             character.removeTags(tag);
           }
         }
@@ -1361,13 +1341,15 @@
     };
 
     Range.prototype.select = function(element) {
-      var docRange, endNode, endOffset, startNode, startOffset, _ref, _ref1;
+      var docRange, endNode, endNodeLen, endOffset, startNode, startNodeLen, startOffset, _ref, _ref1;
       ContentSelect.Range.unselectAll();
       docRange = document.createRange();
       _ref = _getChildNodeAndOffset(element, this._from), startNode = _ref[0], startOffset = _ref[1];
       _ref1 = _getChildNodeAndOffset(element, this._to), endNode = _ref1[0], endOffset = _ref1[1];
-      docRange.setStart(startNode, startOffset);
-      docRange.setEnd(endNode, endOffset);
+      startNodeLen = startNode.length || 0;
+      endNodeLen = endNode.length || 0;
+      docRange.setStart(startNode, Math.min(startOffset, startNodeLen));
+      docRange.setEnd(endNode, Math.min(endOffset, endNodeLen));
       return window.getSelection().addRange(docRange);
     };
 
@@ -1618,7 +1600,7 @@
 }).call(this);
 
 (function() {
-  var C, _Root, _TagNames, _mergers,
+  var _Root, _TagNames, _mergers,
     __slice = [].slice,
     __indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; },
     __hasProp = {}.hasOwnProperty,
@@ -1727,29 +1709,9 @@
             return domElement.removeAttribute('class');
           }
         }
-      } else {
-        return domElement.setAttribute('class', className);
       }
     }
   };
-
-  if (!(C = (function() {
-    function C() {}
-
-    return C;
-
-  })()).name) {
-    Object.defineProperty(Function.prototype, 'name', {
-      get: function() {
-        var name;
-        name = this.toString().match(/^\s*function\s*(\S*)\s*\(/)[1];
-        Object.defineProperty(this, 'name', {
-          value: name
-        });
-        return name;
-      }
-    });
-  }
 
   _TagNames = (function() {
     function _TagNames() {
@@ -1817,6 +1779,10 @@
         parent = parent._parent;
       }
       return parents;
+    };
+
+    Node.prototype.type = function() {
+      return 'Node';
     };
 
     Node.prototype.html = function(indent) {
@@ -2052,6 +2018,10 @@
       return false;
     };
 
+    NodeCollection.prototype.type = function() {
+      return 'NodeCollection';
+    };
+
     NodeCollection.prototype.attach = function(node, index) {
       if (node.parent()) {
         node.parent().detach(node);
@@ -2136,6 +2106,10 @@
       return this._domElement !== null;
     };
 
+    Element.prototype.type = function() {
+      return 'Element';
+    };
+
     Element.prototype.typeName = function() {
       return 'Element';
     };
@@ -2207,12 +2181,12 @@
         element._removeCSSClass('ce-element--drop');
         element._removeCSSClass("ce-element--drop-" + placement[0]);
         element._removeCSSClass("ce-element--drop-" + placement[1]);
-        if (this.constructor.droppers[element.constructor.name]) {
-          this.constructor.droppers[element.constructor.name](this, element, placement);
+        if (this.constructor.droppers[element.type()]) {
+          this.constructor.droppers[element.type()](this, element, placement);
           root.trigger('drop', this, element, placement);
           return;
-        } else if (element.constructor.droppers[this.constructor.name]) {
-          element.constructor.droppers[this.constructor.name](this, element, placement);
+        } else if (element.constructor.droppers[this.type()]) {
+          element.constructor.droppers[this.type()](this, element, placement);
           root.trigger('drop', this, element, placement);
           return;
         }
@@ -2258,10 +2232,10 @@
     };
 
     Element.prototype.merge = function(element) {
-      if (this.constructor.mergers[element.constructor.name]) {
-        return this.constructor.mergers[element.constructor.name](element, this);
-      } else if (element.constructor.mergers[this.constructor.name]) {
-        return element.constructor.mergers[this.constructor.name](element, this);
+      if (this.constructor.mergers[element.type()]) {
+        return this.constructor.mergers[element.type()](element, this);
+      } else if (element.constructor.mergers[this.type()]) {
+        return element.constructor.mergers[this.type()](element, this);
       }
     };
 
@@ -2396,9 +2370,19 @@
           }
         };
       })(this));
-      return this._domElement.addEventListener('paste', (function(_this) {
+      this._domElement.addEventListener('paste', (function(_this) {
         return function(ev) {
           return _this._onPaste(ev);
+        };
+      })(this));
+      this._domElement.addEventListener('dragover', (function(_this) {
+        return function(ev) {
+          return ev.preventDefault();
+        };
+      })(this));
+      return this._domElement.addEventListener('drop', (function(_this) {
+        return function(ev) {
+          return _this._onNativeDrop(ev);
         };
       })(this));
     };
@@ -2413,26 +2397,12 @@
       }
     };
 
-    Element.prototype._onMouseMove = function(ev) {};
+    Element.prototype._onMouseMove = function(ev) {
+      return this._onOver(ev);
+    };
 
     Element.prototype._onMouseOver = function(ev) {
-      var dragging, root;
-      this._addCSSClass('ce-element--over');
-      root = ContentEdit.Root.get();
-      dragging = root.dragging();
-      if (!dragging) {
-        return;
-      }
-      if (dragging === this) {
-        return;
-      }
-      if (root._dropTarget) {
-        return;
-      }
-      if (this.constructor.droppers[dragging.constructor.name] || dragging.constructor.droppers[this.constructor.name]) {
-        this._addCSSClass('ce-element--drop');
-        return root._dropTarget = this;
-      }
+      return this._onOver(ev);
     };
 
     Element.prototype._onMouseOut = function(ev) {
@@ -2453,10 +2423,36 @@
 
     Element.prototype._onMouseUp = function(ev) {};
 
+    Element.prototype._onNativeDrop = function(ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      return ContentEdit.Root.get().trigger('native-drop', this, ev);
+    };
+
     Element.prototype._onPaste = function(ev) {
       ev.preventDefault();
       ev.stopPropagation();
       return ContentEdit.Root.get().trigger('paste', this, ev);
+    };
+
+    Element.prototype._onOver = function(ev) {
+      var dragging, root;
+      this._addCSSClass('ce-element--over');
+      root = ContentEdit.Root.get();
+      dragging = root.dragging();
+      if (!dragging) {
+        return;
+      }
+      if (dragging === this) {
+        return;
+      }
+      if (root._dropTarget) {
+        return;
+      }
+      if (this.constructor.droppers[dragging.type()] || dragging.constructor.droppers[this.type()]) {
+        this._addCSSClass('ce-element--drop');
+        return root._dropTarget = this;
+      }
     };
 
     Element.prototype._removeDOMEventListeners = function() {};
@@ -2591,6 +2587,10 @@
       return this._domElement !== null;
     };
 
+    ElementCollection.prototype.type = function() {
+      return 'ElementCollection';
+    };
+
     ElementCollection.prototype.createDraggingDOMElement = function() {
       var helper, text;
       if (!this.isMounted()) {
@@ -2697,6 +2697,10 @@
       }
       minWidth = Math.min(minWidth, this.size()[0]);
       return [minWidth, minWidth * this.aspectRatio()];
+    };
+
+    ResizableElement.prototype.type = function() {
+      return 'ResizableElement';
     };
 
     ResizableElement.prototype.mount = function() {
@@ -2858,6 +2862,10 @@
       return true;
     };
 
+    Region.prototype.type = function() {
+      return 'Region';
+    };
+
     Region.prototype.html = function(indent) {
       var c;
       if (indent == null) {
@@ -2910,6 +2918,10 @@
 
     _Root.prototype.resizing = function() {
       return this._resizing;
+    };
+
+    _Root.prototype.type = function() {
+      return 'Root';
     };
 
     _Root.prototype.cancelDragging = function() {
@@ -3074,6 +3086,10 @@
       return 'static';
     };
 
+    Static.prototype.type = function() {
+      return 'Static';
+    };
+
     Static.prototype.typeName = function() {
       return 'Static';
     };
@@ -3095,6 +3111,9 @@
     Static.prototype.html = function(indent) {
       if (indent == null) {
         indent = '';
+      }
+      if (HTMLString.Tag.SELF_CLOSING[this._tagName]) {
+        return "" + indent + "<" + this._tagName + (this._attributesToString()) + ">";
       }
       return ("" + indent + "<" + this._tagName + (this._attributesToString()) + ">") + ("" + this._content) + ("" + indent + "</" + this._tagName + ">");
     };
@@ -3169,6 +3188,10 @@
       return 'text';
     };
 
+    Text.prototype.type = function() {
+      return 'Text';
+    };
+
     Text.prototype.typeName = function() {
       return 'Text';
     };
@@ -3199,7 +3222,7 @@
         return;
       }
       helper = Text.__super__.createDraggingDOMElement.call(this);
-      text = this._domElement.textContent;
+      text = HTMLString.String.encode(this._domElement.textContent);
       if (text.length > ContentEdit.HELPER_CHAR_LIMIT) {
         text = text.substr(0, ContentEdit.HELPER_CHAR_LIMIT);
       }
@@ -3353,6 +3376,7 @@
       }
       ev.preventDefault();
       previous = this.previousContent();
+      this._syncContent();
       if (previous) {
         return previous.merge(this);
       }
@@ -3389,13 +3413,13 @@
         return selection.select(previous.domElement());
       } else {
         return ContentEdit.Root.get().trigger('previous-region', this.closest(function(node) {
-          return node.constructor.name === 'Region';
+          return node.type() === 'Region';
         }));
       }
     };
 
     Text.prototype._keyReturn = function(ev) {
-      var element, selection, tail, tip;
+      var element, insertAt, lineBreakStr, selection, tail, tip;
       ev.preventDefault();
       if (this.content.isWhitespace()) {
         return;
@@ -3404,6 +3428,21 @@
       selection = ContentSelect.Range.query(this._domElement);
       tip = this.content.substring(0, selection.get()[0]);
       tail = this.content.substring(selection.get()[1]);
+      if (ev.shiftKey) {
+        insertAt = selection.get()[0];
+        lineBreakStr = '<br>';
+        if (this.content.length() === insertAt) {
+          if (!this.content.characters[insertAt - 1].isTag('br')) {
+            lineBreakStr = '<br><br>';
+          }
+        }
+        this.content = this.content.insert(insertAt, new HTMLString.String(lineBreakStr, true), true);
+        this.updateInnerHTML();
+        insertAt += 1;
+        selection = new ContentSelect.Range(insertAt, insertAt);
+        selection.select(this.domElement());
+        return;
+      }
       this.content = tip.trim();
       this.updateInnerHTML();
       element = new this.constructor('p', {}, tail.trim());
@@ -3433,7 +3472,7 @@
         return selection.select(next.domElement());
       } else {
         return ContentEdit.Root.get().trigger('next-region', this.closest(function(node) {
-          return node.constructor.name === 'Region';
+          return node.type() === 'Region';
         }));
       }
     };
@@ -3522,6 +3561,10 @@
 
     PreText.prototype.cssTypeName = function() {
       return 'pre-text';
+    };
+
+    PreText.prototype.type = function() {
+      return 'PreText';
     };
 
     PreText.prototype.typeName = function() {
@@ -3619,6 +3662,10 @@
       return 'image';
     };
 
+    Image.prototype.type = function() {
+      return 'Image';
+    };
+
     Image.prototype.typeName = function() {
       return 'Image';
     };
@@ -3649,13 +3696,16 @@
     };
 
     Image.prototype.mount = function() {
-      var style;
+      var classes, style;
       this._domElement = document.createElement('div');
+      classes = '';
       if (this.a && this.a['class']) {
-        this._domElement.setAttribute('class', this.a['class']);
-      } else if (this._attributes['class']) {
-        this._domElement.setAttribute('class', this._attributes['class']);
+        classes += ' ' + this.a['class'];
       }
+      if (this._attributes['class']) {
+        classes += ' ' + this._attributes['class'];
+      }
+      this._domElement.setAttribute('class', classes);
       style = this._attributes['style'] ? this._attributes['style'] : '';
       style += "background-image:url(" + this._attributes['src'] + ");";
       if (this._attributes['width']) {
@@ -3743,6 +3793,10 @@
 
     Video.prototype.cssTypeName = function() {
       return 'video';
+    };
+
+    Video.prototype.type = function() {
+      return 'Video';
     };
 
     Video.prototype.typeName = function() {
@@ -3866,12 +3920,16 @@
       return 'list';
     };
 
+    List.prototype.type = function() {
+      return 'List';
+    };
+
     List.prototype.typeName = function() {
       return 'List';
     };
 
     List.prototype._onMouseOver = function(ev) {
-      if (this.parent().constructor.name === 'ListItem') {
+      if (this.parent().type() === 'ListItem') {
         return;
       }
       List.__super__._onMouseOver.call(this, ev);
@@ -3947,6 +4005,10 @@
       return null;
     };
 
+    ListItem.prototype.type = function() {
+      return 'ListItem';
+    };
+
     ListItem.prototype.html = function(indent) {
       var lines;
       if (indent == null) {
@@ -4000,7 +4062,7 @@
       parent = this.parent();
       grandParent = parent.parent();
       siblings = parent.children.slice(parent.children.indexOf(this) + 1, parent.children.length);
-      if (grandParent.constructor.name === 'ListItem') {
+      if (grandParent.type() === 'ListItem') {
         this.listItemText().storeState();
         parent.detach(this);
         grandParent.parent().attach(this, grandParent.parent().children.indexOf(grandParent) + 1);
@@ -4135,6 +4197,10 @@
       return 'list-item-text';
     };
 
+    ListItemText.prototype.type = function() {
+      return 'ListItemText';
+    };
+
     ListItemText.prototype.typeName = function() {
       return 'List item';
     };
@@ -4172,7 +4238,7 @@
           if (ContentEdit.Root.get().dragging() === _this) {
             ContentEdit.Root.get().cancelDragging();
             listRoot = _this.closest(function(node) {
-              return node.parent().constructor.name === 'Region';
+              return node.parent().type() === 'Region';
             });
             return listRoot.drag(ev.pageX, ev.pageY);
           } else {
@@ -4267,7 +4333,7 @@
       },
       'Text': function(element, target, placement) {
         var cssClass, insertIndex, listItem, targetParent, text;
-        if (element.constructor.name === 'Text') {
+        if (element.type() === 'Text') {
           targetParent = target.parent();
           element.parent().detach(element);
           cssClass = element.attr('class');
@@ -4319,7 +4385,7 @@
         }
         target.focus();
         new ContentSelect.Range(offset, offset).select(target._domElement);
-        if (element.constructor.name === 'Text') {
+        if (element.type() === 'Text') {
           if (element.parent()) {
             element.parent().detach(element);
           }
@@ -4350,6 +4416,10 @@
     };
 
     Table.prototype.typeName = function() {
+      return 'Table';
+    };
+
+    Table.prototype.type = function() {
       return 'Table';
     };
 
@@ -4482,6 +4552,10 @@
       return 'table-section';
     };
 
+    TableSection.prototype.type = function() {
+      return 'TableSection';
+    };
+
     TableSection.prototype._onMouseOver = function(ev) {
       TableSection.__super__._onMouseOver.call(this, ev);
       return this._removeCSSClass('ce-element--over');
@@ -4526,6 +4600,10 @@
 
     TableRow.prototype.cssTypeName = function() {
       return 'table-row';
+    };
+
+    TableRow.prototype.type = function() {
+      return 'TableRow';
     };
 
     TableRow.prototype.typeName = function() {
@@ -4590,6 +4668,10 @@
       return null;
     };
 
+    TableCell.prototype.type = function() {
+      return 'TableCell';
+    };
+
     TableCell.prototype.html = function(indent) {
       var lines;
       if (indent == null) {
@@ -4633,6 +4715,10 @@
 
     TableCellText.prototype.cssTypeName = function() {
       return 'table-cell-text';
+    };
+
+    TableCellText.prototype.type = function() {
+      return 'TableCellText';
     };
 
     TableCellText.prototype._isInFirstRow = function() {
@@ -4722,16 +4808,23 @@
     };
 
     TableCellText.prototype._keyDown = function(ev) {
-      var cell, cellIndex, lastCell, nextRow, row;
+      var cell, cellIndex, lastCell, next, nextRow, row;
       ev.preventDefault();
       cell = this.parent();
       if (this._isInLastRow()) {
         row = cell.parent();
         lastCell = row.children[row.children.length - 1].tableCellText();
-        return lastCell.nextContent().focus();
+        next = lastCell.nextContent();
+        if (next) {
+          return next.focus();
+        } else {
+          return ContentEdit.Root.get().trigger('next-region', this.closest(function(node) {
+            return node.type() === 'Region';
+          }));
+        }
       } else {
         nextRow = cell.parent().nextWithTest(function(node) {
-          return node.constructor.name === 'TableRow';
+          return node.type() === 'TableRow';
         });
         cellIndex = cell.parent().children.indexOf(cell);
         cellIndex = Math.min(cellIndex, nextRow.children.length);
@@ -4761,7 +4854,7 @@
             row.attach(newCell);
           }
           section = this.closest(function(node) {
-            return node.constructor.name === 'TableSection';
+            return node.type() === 'TableSection';
           });
           section.attach(row);
           return row.children[0].tableCellText().focus();
@@ -4772,15 +4865,22 @@
     };
 
     TableCellText.prototype._keyUp = function(ev) {
-      var cell, cellIndex, previousRow, row;
+      var cell, cellIndex, previous, previousRow, row;
       ev.preventDefault();
       cell = this.parent();
       if (this._isInFirstRow()) {
         row = cell.parent();
-        return row.children[0].previousContent().focus();
+        previous = row.children[0].previousContent();
+        if (previous) {
+          return previous.focus();
+        } else {
+          return ContentEdit.Root.get().trigger('previous-region', this.closest(function(node) {
+            return node === 'Region';
+          }));
+        }
       } else {
         previousRow = cell.parent().previousWithTest(function(node) {
-          return node.constructor.name === 'TableRow';
+          return node.type() === 'TableRow';
         });
         cellIndex = cell.parent().children.indexOf(cell);
         cellIndex = Math.min(cellIndex, previousRow.children.length);
