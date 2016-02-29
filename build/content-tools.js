@@ -84,7 +84,7 @@
 }).call(this);
 
 (function() {
-  var ALPHA_CHARS, ALPHA_NUMERIC_CHARS, ATTR_DELIM, ATTR_ENTITY_DOUBLE_DELIM, ATTR_ENTITY_NO_DELIM, ATTR_ENTITY_SINGLE_DELIM, ATTR_NAME, ATTR_NAME_FIND_VALUE, ATTR_OR_TAG_END, ATTR_VALUE_DOUBLE_DELIM, ATTR_VALUE_NO_DELIM, ATTR_VALUE_SINGLE_DELIM, CHAR_OR_ENTITY_OR_TAG, CLOSING_TAG, ENTITY, ENTITY_CHARS, OPENING_TAG, OPENNING_OR_CLOSING_TAG, TAG_NAME_CHARS, TAG_NAME_CLOSING, TAG_NAME_MUST_CLOSE, TAG_NAME_OPENING, TAG_OPENING_SELF_CLOSING, _Parser,
+  var ALPHA_CHARS, ALPHA_NUMERIC_CHARS, ATTR_DELIM, ATTR_ENTITY_DOUBLE_DELIM, ATTR_ENTITY_NO_DELIM, ATTR_ENTITY_SINGLE_DELIM, ATTR_NAME, ATTR_NAME_CHARS, ATTR_NAME_FIND_VALUE, ATTR_OR_TAG_END, ATTR_VALUE_DOUBLE_DELIM, ATTR_VALUE_NO_DELIM, ATTR_VALUE_SINGLE_DELIM, CHAR_OR_ENTITY_OR_TAG, CLOSING_TAG, ENTITY, ENTITY_CHARS, OPENING_TAG, OPENNING_OR_CLOSING_TAG, TAG_NAME_CHARS, TAG_NAME_CLOSING, TAG_NAME_MUST_CLOSE, TAG_NAME_OPENING, TAG_OPENING_SELF_CLOSING, _Parser,
     __slice = [].slice,
     __indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
 
@@ -789,6 +789,8 @@
 
   ALPHA_NUMERIC_CHARS = ALPHA_CHARS.concat('1234567890'.split(''));
 
+  ATTR_NAME_CHARS = ALPHA_NUMERIC_CHARS.concat([':']);
+
   ENTITY_CHARS = ALPHA_NUMERIC_CHARS.concat(['#']);
 
   TAG_NAME_CHARS = ALPHA_NUMERIC_CHARS.concat([':']);
@@ -895,7 +897,7 @@
       this.fsm.addTransition('>', TAG_NAME_MUST_CLOSE, CHAR_OR_ENTITY_OR_TAG, function() {
         return this._popTag();
       });
-      this.fsm.addTransitions(ALPHA_NUMERIC_CHARS, ATTR_NAME, null, function(c) {
+      this.fsm.addTransitions(ATTR_NAME_CHARS, ATTR_NAME, null, function(c) {
         return this.attributeName += c;
       });
       this.fsm.addTransitions([' ', '\n'], ATTR_NAME, ATTR_NAME_FIND_VALUE);
@@ -1003,7 +1005,7 @@
       }
       this.tagName = '';
       this.selfClosed = false;
-      return this.attributes = [];
+      return this.attributes = {};
     };
 
     _Parser.prototype._popTag = function() {
@@ -1308,7 +1310,6 @@
   })();
 
 }).call(this);
-
 (function() {
   var SELF_CLOSING_NODE_NAMES, _containedBy, _getChildNodeAndOffset, _getNodeRange, _getOffsetOfChildNode,
     __indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
@@ -3256,7 +3257,7 @@
         indent = '';
       }
       if (!this._lastCached || this._lastCached < this._modified) {
-        content = this.content.copy();
+        content = this.content.copy().trim();
         content.optimize();
         this._lastCached = Date.now();
         this._cached = content.html();
@@ -3352,7 +3353,11 @@
         };
       })(this), ContentEdit.DRAG_HOLD_DURATION);
       if (this.content.length() === 0 && ContentEdit.Root.get().focused() === this) {
-        return ev.preventDefault();
+        ev.preventDefault();
+        if (document.activeElement !== this._domElement) {
+          this._domElement.focus();
+        }
+        return new ContentSelect.Range(0, 0).select(this._domElement);
       }
     };
 
@@ -3512,11 +3517,11 @@
     };
 
     Text.prototype._syncContent = function(ev) {
-      var newSnaphot, snapshot;
+      var newSnapshot, snapshot;
       snapshot = this.content.html();
       this.content = new HTMLString.String(this._domElement.innerHTML, this.content.preserveWhitespace());
-      newSnaphot = this.content.html();
-      if (snapshot !== newSnaphot) {
+      newSnapshot = this.content.html();
+      if (snapshot !== newSnapshot) {
         this.taint();
       }
       return this._flagIfEmpty();
@@ -4230,7 +4235,7 @@
         indent = '';
       }
       if (!this._lastCached || this._lastCached < this._modified) {
-        content = this.content.copy();
+        content = this.content.copy().trim();
         content.optimize();
         this._lastCached = Date.now();
         this._cached = content.html();
@@ -4779,7 +4784,7 @@
         indent = '';
       }
       if (!this._lastCached || this._lastCached < this._modified) {
-        content = this.content.copy();
+        content = this.content.copy().trim();
         content.optimize();
         this._lastCached = Date.now();
         this._cached = content.html();
@@ -4924,6 +4929,7 @@
     IMAGE_UPLOADER: null,
     MIN_CROP: 10,
     RESTRICTED_ATTRIBUTES: {
+      '*': ['style'],
       'img': ['height', 'src', 'width', 'data-ce-max-width', 'data-ce-min-width'],
       'iframe': ['height', 'width']
     },
@@ -5002,6 +5008,17 @@
           return url;
       }
       return null;
+    },
+    getRestrictedAtributes: function(tagName) {
+      var restricted;
+      restricted = [];
+      if (ContentTools.RESTRICTED_ATTRIBUTES[tagName]) {
+        restricted = restricted.concat(ContentTools.RESTRICTED_ATTRIBUTES[tagName]);
+      }
+      if (ContentTools.RESTRICTED_ATTRIBUTES['*']) {
+        restricted = restricted.concat(ContentTools.RESTRICTED_ATTRIBUTES['*']);
+      }
+      return restricted;
     }
   };
 
@@ -5696,7 +5713,7 @@
           if (element === _this._lastUpdateElement) {
             if (element && element.selection) {
               selection = element.selection();
-              if (_this._lastUpdateSelection && selection.eq(_this._lastUpdateSelection)) {
+              if (_this._lastUpdateSelection && !selection.eq(_this._lastUpdateSelection)) {
                 update = true;
               }
             }
@@ -5708,16 +5725,22 @@
               update = true;
             }
             _this._lastUpdateHistoryLength = app.history.length();
+            if (_this._lastUpdateHistoryIndex !== app.history.index()) {
+              update = true;
+            }
+            _this._lastUpdateHistoryIndex = app.history.index();
           }
           _this._lastUpdateElement = element;
           _this._lastUpdateSelection = selection;
-          _ref = _this._toolUIs;
-          _results = [];
-          for (name in _ref) {
-            toolUI = _ref[name];
-            _results.push(toolUI.update(element, selection));
+          if (update) {
+            _ref = _this._toolUIs;
+            _results = [];
+            for (name in _ref) {
+              toolUI = _ref[name];
+              _results.push(toolUI.update(element, selection));
+            }
+            return _results;
           }
-          return _results;
         };
       })(this);
       this._updateToolsTimeout = setInterval(this._updateTools, 100);
@@ -5900,9 +5923,11 @@
     };
 
     ToolUI.prototype.update = function(element, selection) {
-      if (!(element && element.isMounted())) {
-        this.disabled(true);
-        return;
+      if (this.tool.requiresElement) {
+        if (!(element && element.isMounted())) {
+          this.disabled(true);
+          return;
+        }
       }
       if (this.tool.canApply(element, selection)) {
         this.disabled(false);
@@ -5941,11 +5966,13 @@
       var element, selection;
       if (this._mouseDown) {
         element = ContentEdit.Root.get().focused();
-        if (!(element && element.isMounted())) {
-          return;
+        if (this.tool.requiresElement) {
+          if (!(element && element.isMounted())) {
+            return;
+          }
         }
         selection = null;
-        if (element.selection) {
+        if (element && element.selection) {
           selection = element.selection();
         }
         this.apply(element, selection);
@@ -6581,7 +6608,7 @@
           changedAttributes[name] = value;
         }
       }
-      restricted = ContentTools.RESTRICTED_ATTRIBUTES[this.element.tagName()];
+      restricted = ContentTools.getRestrictedAtributes(this.element.tagName());
       _ref1 = this.element.attributes();
       for (name in _ref1) {
         value = _ref1[name];
@@ -6636,7 +6663,7 @@
       }
       this._domAttributes = this.constructor.createDiv(['ct-properties-dialog__attributes']);
       this._domView.appendChild(this._domAttributes);
-      restricted = ContentTools.RESTRICTED_ATTRIBUTES[this.element.tagName()];
+      restricted = ContentTools.getRestrictedAtributes(this.element.tagName());
       attributes = this.element.attributes();
       attributeNames = [];
       for (name in attributes) {
@@ -6735,7 +6762,7 @@
         var element, otherAttributeUI, restricted, valid, _i, _len, _ref;
         element = dialog.element;
         name = this.name().toLowerCase();
-        restricted = ContentTools.RESTRICTED_ATTRIBUTES[element.tagName()];
+        restricted = ContentTools.getRestrictedAtributes(element.tagName());
         valid = true;
         if (restricted && restricted.indexOf(name) !== -1) {
           valid = false;
@@ -7323,6 +7350,22 @@
       return this._shiftDown;
     };
 
+    _EditorApp.prototype.getState = function() {
+      return this._state;
+    };
+
+    _EditorApp.prototype.isDormant = function() {
+      return this._state === ContentTools.EditorApp.DORMANT;
+    };
+
+    _EditorApp.prototype.isReady = function() {
+      return this._state === ContentTools.EditorApp.READY;
+    };
+
+    _EditorApp.prototype.isEditing = function() {
+      return this._state === ContentTools.EditorApp.EDITING;
+    };
+
     _EditorApp.prototype.busy = function(busy) {
       return this._ignition.busy(busy);
     };
@@ -7782,6 +7825,10 @@
       return this._snapshotIndex > 0;
     };
 
+    History.prototype.index = function() {
+      return this._snapshotIndex;
+    };
+
     History.prototype.length = function() {
       return this._snapshots.length;
     };
@@ -7987,6 +8034,8 @@
     Tool.label = 'Tool';
 
     Tool.icon = 'tool';
+
+    Tool.requiresElement = true;
 
     Tool.canApply = function(element, selection) {
       return false;
@@ -8937,6 +8986,8 @@
 
     Undo.icon = 'undo';
 
+    Undo.requiresElement = false;
+
     Undo.canApply = function(element, selection) {
       var app;
       app = ContentTools.EditorApp.get();
@@ -8968,6 +9019,8 @@
     Redo.label = 'Redo';
 
     Redo.icon = 'redo';
+
+    Redo.requiresElement = false;
 
     Redo.canApply = function(element, selection) {
       var app;
